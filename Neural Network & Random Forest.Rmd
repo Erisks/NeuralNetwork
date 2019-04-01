@@ -1,0 +1,128 @@
+---
+title: "Neural Network & Random Forest"
+author: "Erika Vargas"
+date: "March 5, 2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE}
+#loading necessary libraries to conduct neural network algorithm 
+library(neuralnet)
+library(GGally)
+library(tidyverse)
+library(caret)
+```
+
+```{r warning=FALSE}
+#loading the data(using iris dataset)
+data(iris)
+head(iris, 3)
+summary(iris)
+```
+
+*The data set contains 3 classes (setosa, versicolor, and virginica) of 50 instances each, where each class refers to a type of iris plant. Four features were measured from each sample: the length and the width of the sepals and petals, in centimeters.*
+
+```{r}
+pairs(Species~., data=iris, col=iris$Species)
+```
+
+*There is a high correlation between the sepal length and the sepal width of the Setosa iris flowers, while the correlation is somewhat less high for the Virginica and Versicolor flowers.*
+*The graph indicates a positive correlation between the petal length and the petal width for all different species that are included into the “iris” data set.*
+*The scatter plots reveal a strong classification criteria. Setosa has the smallest petals versicolor has medium-sized petals and virginica has the largest petals.*
+
+```{r}
+ggpairs(iris, title = "Scatterplot Matrix of the Features of the Iris Data Set")
+```
+
+*we can see that setosa has quite different mean and sd values from the other two species, especially for petal length and petal width.*
+*we see from the plot above that sepal length and sepal width do not vary much across species, however, petal length and petal width are quite different for different species.*
+*petal length of versicolor and virginica are approximately normally distributed with different means and similar variability. Also, species setosa lies far away from these two species.*
+
+### test and training datasets
+```{r}
+#building training and testing dataset
+data <- which(1:length(iris[,1])%%3 == 0)
+iristrain <- iris[-data,]
+dim(iristrain)
+iristest <- iris[data,]
+dim(iristest)
+
+```
+
+## NEURAL NETWORK
+
+```{r}
+#Applying neural network with neuralnet library
+nn <- neuralnet(Species ~ Sepal.Length+Sepal.Width + Petal.Length + Petal.Width,
+                 data=iristrain, 
+                  hidden=c(3))
+plot(nn)
+```
+
+*The arrows in black (and associated numbers) are the weights which we can think of as how much that variable contributes to the next node. The blue lines are the bias weights.*
+*The middle nodes (i.e. anything between the input and output nodes) are the hidden nodes. Each of these nodes constitute a component that the network is learning to recognize.*
+
+```{r}
+#making prediction 
+mypredict <- neuralnet::compute(nn, iristest[-5])$net.result                               
+# Put multiple binary output to categorical output
+maxidx <- function(arr) {
+      return(which(arr == max(arr)))
+    }
+idx <- apply(mypredict, c(1), maxidx)
+prediction <- c('setosa', 'versicolor', 'virginica')[idx]
+table(prediction, iristest$Species)
+nn$result.matrix
+
+```
+
+*Only one (1/50 =0.02) flower in the test dataset was misclassified. *
+
+
+## RANDOM FOREST
+
+*To develop a random forest, I used the library randomForest. randomForest implements Breiman's random forest algorithm (based on Breiman and Cutler's original Fortran code) for classification and regression. It can also be used in unsupervised mode for assessing proximities among data points. I used the same train and test dataset from neural network.*
+
+```{r}
+library(randomForest)
+iris_rf <- randomForest(Species~.,data=iristrain,proximity=TRUE)
+table(predict(iris_rf),iristrain$Species)
+print(iris_rf)
+```
+
+*3 flowers (3/100 = 0.03) flowers from the training dataset were misclassified using the random forest algorithm. 2 virginica flowers were classified as versicolor and 1 versicolor was classified as virginica.*
+
+```{r}
+plot(iris_rf)
+```
+
+```{r}
+importance(iris_rf)
+varImpPlot(iris_rf)
+```
+
+*Mean Decrease in Gini is computed as “total decrease in node impurities from splitting on the variable, averaged over all trees”. MeanDecreaseGini is based on the gini impurity which also means the lower the gini impurity, then the higher the purity of the variable.*
+*Hence, we can say that Sepal width, and Sepal Length are the purest variables. Perhaps,  this has to do with the characteristics I found at the beginning of the dataset where sepal length and sepal width do not vary much across species, while petal length and petal width are quite different for different species making them less pure variables.*
+
+
+```{r}
+## prediction with testing data
+irisPred<-predict(iris_rf,newdata=iristest)
+table(irisPred, iristest$Species)
+```
+
+*3 flowers (3/100 = 0.03) flowers from the test dataset were misclassified using the random forest algorithm. 2 virginica flowers were classified as versicolor and 1 versicolor was classified as virginica. The predictions from the training and testing dataset using random forest algorithm were the same.*
+
+```{r}
+plot(margin(iris_rf,iristest$Species))
+```
+
+*The two supervised algorithms have similar performance, the overall classification error for the train dataset was higher in the neural network algorithm than in the random forest (0.5 against 0.03). However, when using the test data, the neural network method was more accurate than the random forest. However, the misclassification rate for both methods is still under 0.05, which from my point of view is still acceptable. *
+
+
+
+
